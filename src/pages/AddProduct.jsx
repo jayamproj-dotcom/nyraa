@@ -797,6 +797,8 @@ const AddProduct = () => {
                                   )}
                                 </select> */}
 
+                                
+
                                 <div className="space-y-2">
                                   {sizes.map((size) => {
                                     const isSelected = variant.sizes?.some(s => s.size === size.name);
