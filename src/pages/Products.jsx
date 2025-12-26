@@ -245,6 +245,18 @@ const Products = () => {
   const [validatedProducts, setValidatedProducts] = useState([])
   const fileInputRef = useRef(null)
 
+  const [debouncedSearch, setDebouncedSearch] = useState(searchQuery);
+  const searchRef = useRef(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 400); // 400ms delay
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+
   const { addToast } = useToast()
   const navigate = useNavigate()
 
@@ -282,7 +294,7 @@ const Products = () => {
       const params = {
         page: currentPage,
         limit: itemsPerPage,
-        search: searchQuery || undefined,
+        search: debouncedSearch || undefined,
         category: selectedCategory !== "all" ? selectedCategory : undefined,
         sortBy,
         sortOrder,
@@ -303,19 +315,37 @@ const Products = () => {
       if (response.data.success) {
         const normalizedProducts = response.data.data.products.map((product) => {
           // Parse images safely
+
+          console.log("product :" , product);
+          
           const images = parseJsonSafely(product.images, [])
           const normalizedImages = images.map((img) => normalizeImageUrl(img))
 
           // Parse variants safely
           const variants = parseJsonSafely(product.variants, [])
-          const normalizedVariants = variants.map((variant) => ({
-            color: variant.color || "N/A",
-            size: variant.size || "N/A",
-            type: variant.type || "N/A",
-            price: Number.parseFloat(variant.price) || 0,
-            originalPrice: variant.originalPrice ? Number.parseFloat(variant.originalPrice) : null,
-            quantity: Number.parseInt(variant.quantity) || 0,
-          }))
+          console.log(variants);
+          
+          const normalizedVariants = variants.map((variant) => {
+            const rawImages = parseJsonSafely(variant.images, []);
+
+            const normalizedVariantImages = rawImages.map((img) =>
+              normalizeImageUrl(img)
+            );
+
+            return {
+              color: variant.color || "N/A",
+              size: variant.size || "N/A",
+              type: variant.type || "N/A",
+              price: Number.parseFloat(variant.price) || 0,
+              originalPrice: variant.originalPrice
+                ? Number.parseFloat(variant.originalPrice)
+                : null,
+              quantity: Number.parseInt(variant.quantity) || 0,
+              images: normalizedVariantImages, // ✅ FIXED
+            };
+          });
+
+
 
           // Parse specifications safely
           const specifications = parseJsonSafely(product.specifications, [])
@@ -349,7 +379,7 @@ const Products = () => {
     }
   }, [
     currentPage,
-    searchQuery,
+    debouncedSearch,
     selectedCategory,
     selectedStatus,
     sortBy,
@@ -358,6 +388,7 @@ const Products = () => {
     cacheBuster,
     addToast,
   ])
+
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -676,6 +707,7 @@ const Products = () => {
     )
   }
 
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -727,7 +759,7 @@ const Products = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="relative">
                 <input
-                  type="text"
+                  type="text"      
                   placeholder="Search products..."
                   className="w-full pl-12 pr-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/50 backdrop-blur-sm transition-all"
                   value={searchQuery}
@@ -755,7 +787,7 @@ const Products = () => {
                 <option value="all">All Statuses</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
-                <option value="draft">Draft</option>
+                {/* <option value="draft">Draft</option> */}
               </select>
             </div>
             <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
@@ -819,20 +851,38 @@ const Products = () => {
                       const prices = product.variants.map((v) => v.price).filter((p) => p > 0)
                       const minPrice = prices.length > 0 ? Math.min(...prices) : 0
                       const maxPrice = prices.length > 0 ? Math.max(...prices) : 0
+                      const firstVariantImage = product.variants?.[0]?.images?.[0];
+
+                      console.log(product.variants);
+                      
+
+                      console.log("firstVariantImage :" + firstVariantImage);
+                      
 
                       return (
                         <tr key={product.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-4">
                               <div className="relative">
-                                <img
+                                {/* <img
                                   src={product.image || "/placeholder.svg"}
                                   alt={product.name || "Product"}
                                   className="w-16 h-20 object-cover rounded-xl shadow-sm"
                                   onError={(e) => {
                                     e.target.src = "/placeholder.svg?height=80&width=64"
                                   }}
+                                /> */}
+
+                                <img
+                                  src={firstVariantImage}
+                                  alt={product.name || "Product"}
+                                  className="w-16 h-20 object-cover rounded-xl shadow-sm"
+                                // onError={(e) => {
+                                //   e.target.src = "/placeholder.svg?height=80&width=64"
+                                // }}
                                 />
+
+
                                 {product.images?.length > 1 && (
                                   <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
                                     {product.images.length}
@@ -845,60 +895,61 @@ const Products = () => {
                               </div>
                             </div>
                           </td>
+
                           <td className="px-6 py-4">
                             <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
                               {product.categoryName}
                             </span>
                           </td>
+                          
                           <td className="px-6 py-4">
-  <div className="flex flex-wrap gap-1">
-    {product.variants.length > 0 ? (
-      <>
-        {product.variants.slice(0, 2).map((variant, i) => (
-          <span
-            key={i}
-            className="inline-flex flex-col items-start px-2 py-1 rounded-lg text-xs bg-gray-100 text-gray-800 font-medium"
-          >
-            {variant.color && <span>Color: {variant.color}</span>}
-            {variant.size && <span>Size: {variant.size}</span>}
-            {variant.name && <span>Name: {variant.name}</span>}
-          </span>
-        ))}
-        {product.variants.length > 2 && (
-          <span className="text-xs text-gray-500 px-2 py-1 self-center">
-            +{product.variants.length - 2} more
-          </span>
-        )}
-      </>
-    ) : (
-      <span className="text-gray-500 text-sm">No variants</span>
-    )}
-  </div>
-</td>
-                       <td className="px-6 py-4">
-  {minPrice > 0 && maxPrice > 0 ? (
-    <div className="font-semibold text-gray-900">
-      ₹{minPrice.toLocaleString()}
-      {minPrice !== maxPrice && (
-        <span className="line-through text-red-500 ml-2">
-          ₹{maxPrice.toLocaleString()}
-        </span>
-      )}
-    </div>
-  ) : (
-    <span className="text-gray-500">N/A</span>
-  )}
-</td>
+                            <div className="flex flex-wrap gap-1">
+                              {product.variants.length > 0 ? (
+                                <>
+                                  {product.variants.slice(0, 2).map((variant, i) => (
+                                    <span
+                                      key={i}
+                                      className="inline-flex flex-col items-start px-2 py-1 rounded-lg text-xs bg-gray-100 text-gray-800 font-medium"
+                                    >
+                                      {variant.color && <span>Color: {variant.color}</span>}
+                                      {variant.size && <span>Size: {variant.size}</span>}
+                                      {variant.name && <span>Name: {variant.name}</span>}
+                                    </span>
+                                  ))}
+                                  {product.variants.length > 2 && (
+                                    <span className="text-xs text-gray-500 px-2 py-1 self-center">
+                                      +{product.variants.length - 2} more
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-gray-500 text-sm">No variants</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            {minPrice > 0 && maxPrice > 0 ? (
+                              <div className="font-semibold text-gray-900">
+                                ₹{minPrice.toLocaleString()}
+                                {/* {minPrice !== maxPrice && (
+                                  <span className="line-through text-red-500 ml-2">
+                                    ₹{maxPrice.toLocaleString()}
+                                  </span>
+                                )} */}
+                              </div>
+                            ) : (
+                              <span className="text-gray-500">N/A</span>
+                            )}
+                          </td>
 
                           <td className="px-6 py-4">
                             <span
-                              className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
-                                product.status === "active"
+                              className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${product.status === "active"
                                   ? "bg-green-100 text-green-800"
                                   : product.status === "inactive"
                                     ? "bg-red-100 text-red-800"
                                     : "bg-gray-100 text-gray-800"
-                              }`}
+                                }`}
                             >
                               {product.status?.toUpperCase() || "N/A"}
                             </span>
@@ -969,23 +1020,33 @@ const Products = () => {
                 const prices = product.variants.map((v) => v.price).filter((p) => p > 0)
                 const minPrice = prices.length > 0 ? Math.min(...prices) : 0
                 const maxPrice = prices.length > 0 ? Math.max(...prices) : 0
-
+                const firstVariantImage = product.variants?.[0]?.images?.[0];
                 return (
                   <div key={product.id} className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 overflow-hidden hover:shadow-xl transition-all duration-300">
                     <div className="relative">
-                      <img
+                      {/* <img
                         src={product.image || "/placeholder.svg"}
                         alt={product.name}
                         className="w-full h-48 object-cover"
                         onError={(e) => {
                           e.target.src = "/placeholder.svg?height=192&width=300"
                         }}
-                      />
+                      /> */}
                       {product.images?.length > 1 && (
                         <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 text-white text-xs rounded-full">
                           {product.images.length} photos
                         </div>
                       )}
+
+                      <img
+                        src={firstVariantImage}
+                        alt={product.name}
+                        className="w-16 h-20 object-cover rounded-xl shadow-sm"
+                        // onError={(e) => {
+                        //   e.target.src = "/placeholder.svg";
+                        // }}
+                      />
+
                       <div className="absolute top-3 left-3">
                         <span
                           className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${

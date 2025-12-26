@@ -8,6 +8,76 @@ import axios from "axios"
 
 const API_BASE_URL = "http://localhost:5000/api"
 
+const CategoryForm = ({
+  formData,
+  onChange,
+  onCancel,
+  onSubmit,
+  isEdit = false,
+}) => {
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Category Name *
+        </label>
+        <input
+          type="text"
+          name="category"
+          value={formData.category}
+          onChange={onChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Enter category name"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Description
+        </label>
+        <textarea
+          name="description"
+          value={formData.description}
+          onChange={onChange}
+          rows={3}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Status
+        </label>
+        <select
+          name="status"
+          value={formData.status}
+          onChange={onChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+
+      <div className="flex justify-end gap-3 pt-4">
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 border border-gray-300 rounded-lg"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={onSubmit}
+          className="px-4 py-2 bg-gradient-to-r from-[#C77096] to-[#A83E68] text-white rounded-lg"
+        >
+          {isEdit ? "Update Category" : "Add Category"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 const Categories = () => {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
@@ -131,60 +201,6 @@ const filteredCategories = categories.filter(
     setShowDeleteDialog(true)
   }
 
-  const CategoryForm = ({ isEdit = false }) => (
-    <div className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Category Name *</label>
-        <input
-          type="text"
-          name="category"
-          value={formData.category}
-          onChange={handleInputChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="Enter category name"
-          required
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
-        <textarea
-          name="description"
-          value={formData.description}
-          onChange={handleInputChange}
-          rows={3}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="Enter category description"
-        />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-        <select
-          name="status"
-          value={formData.status}
-          onChange={handleInputChange}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        >
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-        </select>
-      </div>
-      <div className="flex justify-end gap-3 pt-4">
-        <button
-          onClick={() => (isEdit ? setShowEditModal(false) : setShowAddModal(false))}
-          className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={isEdit ? handleEditCategory : handleAddCategory}
-          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover: bg-gradient-to-r from-[#C77096] to-[#A83E68] hover:brightness-110 text-white"
-        >
-          {isEdit ? "Update Category" : "Add Category"}
-        </button>
-      </div>
-    </div>
-  )
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -292,14 +308,26 @@ const filteredCategories = categories.filter(
       </div>
 
       {/* Add Category Modal */}
-      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add New Category" size="md">
-        <CategoryForm />
+      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Add New Category">
+        <CategoryForm
+          formData={formData}
+          onChange={handleInputChange}
+          onCancel={() => setShowAddModal(false)}
+          onSubmit={handleAddCategory}
+        />
       </Modal>
 
       {/* Edit Category Modal */}
-      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Category" size="md">
-        <CategoryForm isEdit={true} />
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Category">
+        <CategoryForm
+          formData={formData}
+          onChange={handleInputChange}
+          onCancel={() => setShowEditModal(false)}
+          onSubmit={handleEditCategory}
+          isEdit
+        />
       </Modal>
+
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

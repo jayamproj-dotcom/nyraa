@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, ImageIcon, X, Pencil, Trash2, ArrowLeft, Save, XCircle, ChevronRight, Upload, Download } from 'lucide-react';
+import { Plus, ImageIcon,UploadIcon, X, Pencil, Trash2, ArrowLeft, Save, XCircle, ChevronRight, Upload, Download } from 'lucide-react';
 import { useToast } from "../context/ToastContext";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
@@ -13,7 +13,7 @@ const AddProduct = () => {
     description: "",
     categoryId: "",
     cat_slug: "",
-    variants: [{ color: "", size: "", type: "", price: "", originalPrice: "", quantity: "" }],
+    variants: [{ color: "", size: "", type: "", price: "", originalPrice: "", quantity: "", images: [] }],
     specifications: [{ name: "Fabric", value: "" }],
     images: [],
     seoTitle: "",
@@ -70,23 +70,44 @@ const AddProduct = () => {
           description: product.description || "",
           categoryId: product.categoryId || "",
           cat_slug: product.cat_slug || "",
-          variants: product.variants && Array.isArray(product.variants) && product.variants.length > 0 
-            ? product.variants.map(variant => ({
+
+          variants:
+            product.variants &&
+              Array.isArray(product.variants) &&
+              product.variants.length > 0
+              ? product.variants.map((variant) => ({
                 color: variant.color || "",
                 size: variant.size || "",
                 type: variant.type || "",
                 price: variant.price?.toString() || "",
                 originalPrice: variant.originalPrice?.toString() || "",
-                quantity: variant.quantity?.toString() || ""
+                quantity: variant.quantity?.toString() || "",
+                images: Array.isArray(variant.images) ? variant.images : []   // ✅ FIXED
               }))
-            : [{ color: "", size: "", type: "", price: "", originalPrice: "", quantity: "" }],
-          specifications: product.specifications && Array.isArray(product.specifications) && product.specifications.length > 0 
-            ? product.specifications.map(spec => ({
+              : [
+                {
+                  color: "",
+                  size: "",
+                  type: "",
+                  price: "",
+                  originalPrice: "",
+                  quantity: "",
+                  images: []  // Default
+                }
+              ],
+
+          specifications:
+            product.specifications &&
+              Array.isArray(product.specifications) &&
+              product.specifications.length > 0
+              ? product.specifications.map((spec) => ({
                 name: "Fabric",
                 value: spec.Fabric || ""
               }))
-            : [{ name: "Fabric", value: "" }],
+              : [{ name: "Fabric", value: "" }],
+
           images: images,
+
           seoTitle: product.seoTitle || "",
           metaKeywords: product.metaKeywords || "",
           seoDescription: product.seoDescription || "",
@@ -94,7 +115,11 @@ const AddProduct = () => {
           availability: product.availability || "in_stock",
           brand: product.brand || "",
           material: product.material || "",
-          tags: Array.isArray(product.tags) ? product.tags : (product.tags ? [product.tags] : [])
+          tags: Array.isArray(product.tags)
+            ? product.tags
+            : product.tags
+              ? [product.tags]
+              : []
         });
         setImagePreviews(images);
       }
@@ -216,7 +241,8 @@ const AddProduct = () => {
           type: variant.type,
           price: parseFloat(variant.price) || 0,
           originalPrice: parseFloat(variant.originalPrice) || 0,
-          quantity: parseInt(variant.quantity) || 0
+          quantity: parseInt(variant.quantity) || 0,
+          images: variant.images || []
         })),
         specifications: formData.specifications.map(spec => ({
           Fabric: spec.value
@@ -287,6 +313,109 @@ const AddProduct = () => {
       setSelectedImageIndex(prev => prev - 1);
     }
   };
+
+  // const handleVariantImageChange = (e, variantIndex) => {
+  //   const files = Array.from(e.target.files);
+
+  //   const updated = files.map(file => ({
+  //     preview: URL.createObjectURL(file),
+  //     file: file
+  //   }));
+
+  //   setFormData(prev => {
+  //     const variants = [...prev.variants];
+
+  //     const existing = variants[variantIndex].images || [];
+
+  //     variants[variantIndex].images = [...existing, ...updated];
+
+  //     return { ...prev, variants };
+  //   });
+  // };
+
+
+  // const handleVariantImageChange = (e, variantIndex) => {
+  //   const files = Array.from(e.target.files);
+
+  //   // Create preview objects
+  //   const newImages = files.map(file => ({
+  //     preview: URL.createObjectURL(file),
+  //     file: file,
+  //   }));
+
+  //   setFormData(prev => {
+  //     const variants = [...prev.variants];
+  //     const existing = variants[variantIndex].images || [];
+
+  //     // Append new images (duplicates allowed)
+  //     variants[variantIndex].images = [...existing, ...newImages];
+
+  //     return { ...prev, variants };
+  //   });
+
+  //   // Reset input so user can select the same file again
+  //   e.target.value = "";
+  // };
+
+  const MAX_IMAGES = 5;
+
+  const handleVariantImageChange = (e, variantIndex) => {
+    const files = Array.from(e.target.files);
+
+    setFormData(prev => {
+      const variants = [...prev.variants];
+      const existingImages = variants[variantIndex].images || [];
+
+      // 🚫 If already 5 images
+      if (existingImages.length >= MAX_IMAGES) {
+        addToast("You can upload a maximum of 5 images", "error");
+        return prev;
+      }
+
+      // ✅ Only allow remaining slots
+      const remainingSlots = MAX_IMAGES - existingImages.length;
+      const allowedFiles = files.slice(0, remainingSlots);
+
+      if (files.length > remainingSlots) {
+        addToast("Only 5 images are allowed per variant", "error");
+      }
+
+      const newImages = allowedFiles.map(file => ({
+        preview: URL.createObjectURL(file),
+        file,
+      }));
+
+      variants[variantIndex].images = [
+        ...existingImages,
+        ...newImages,
+      ];
+
+      return { ...prev, variants };
+    });
+
+    // Reset input so same file can be selected again
+    e.target.value = "";
+  };
+
+
+
+  const removeVariantImage = (variantIndex, imageIndex) => {
+    setFormData(prev => {
+      const updatedVariants = [...prev.variants];
+      const imageToRemove = updatedVariants[variantIndex]?.images?.[imageIndex];
+
+      if (imageToRemove?.preview) {
+        URL.revokeObjectURL(imageToRemove.preview);
+      }
+
+      updatedVariants[variantIndex].images = updatedVariants[variantIndex].images.filter(
+        (_, i) => i !== imageIndex
+      );
+
+      return { ...prev, variants: updatedVariants };
+    });
+  };
+
 
   const viewFullImage = (index) => {
     setSelectedImageIndex(index);
@@ -383,6 +512,7 @@ const AddProduct = () => {
     e.preventDefault();
     setLoading(true);
 
+    // --- VALIDATIONS (unchanged) ---
     if (!formData.name.trim()) {
       addToast("Product Name is required", "error");
       setLoading(false);
@@ -393,7 +523,6 @@ const AddProduct = () => {
       setLoading(false);
       return;
     }
-
     if (formData.variants.length === 0) {
       addToast("At least one variant is required", "error");
       setLoading(false);
@@ -414,17 +543,17 @@ const AddProduct = () => {
       setLoading(false);
       return;
     }
-    if (formData.variants.some(variant => !variant.price || isNaN(Number.parseFloat(variant.price)))) {
+    if (formData.variants.some(variant => !variant.price || isNaN(parseFloat(variant.price)))) {
       addToast("All variants must have a valid price", "error");
       setLoading(false);
       return;
     }
-    if (formData.variants.some(variant => variant.originalPrice && isNaN(Number.parseFloat(variant.originalPrice)))) {
+    if (formData.variants.some(variant => variant.originalPrice && isNaN(parseFloat(variant.originalPrice)))) {
       addToast("All variants must have a valid original price", "error");
       setLoading(false);
       return;
     }
-    if (formData.variants.some(variant => !variant.quantity || isNaN(Number.parseInt(variant.quantity)))) {
+    if (formData.variants.some(variant => !variant.quantity || isNaN(parseInt(variant.quantity)))) {
       addToast("All variants must have a valid quantity", "error");
       setLoading(false);
       return;
@@ -439,11 +568,12 @@ const AddProduct = () => {
       setLoading(false);
       return;
     }
-
     const formDataToSend = new FormData();
+
+    // non-image fields
     Object.entries(formData).forEach(([key, value]) => {
-      if (key !== "images") {
-        if (key === "variants" || key === "specifications") {
+      if (key !== "images" && key !== "variants") {
+        if (key === "specifications") {
           formDataToSend.append(key, JSON.stringify(value));
         } else {
           formDataToSend.append(key, value);
@@ -451,26 +581,54 @@ const AddProduct = () => {
       }
     });
 
-    const existingImages = formData.images.filter(img => typeof img === "string");
-    const newImages = formData.images.filter(img => img instanceof File);
-    
-    if (existingImages.length > 0) {
-      formDataToSend.append("existingImages", JSON.stringify(existingImages));
-    }
-    
-    newImages.forEach((image) => {
-      formDataToSend.append("images", image);
-    });
+    // Add variants JSON
+    formDataToSend.append(
+      "variants",
+      JSON.stringify(
+        formData.variants.map(v => ({
+          color: v.color,
+          size: v.size,
+          type: v.type,
+          price: v.price,
+          originalPrice: v.originalPrice,
+          quantity: v.quantity,
+          images: v.images ? v.images.map(img =>
+            img.file ? img.file.name : img
+          ) : []
+        }))
+      )
+    );
 
+    // // Add actual files
+    formData.variants.forEach((v, i) => {
+      if (v.images) {
+        v.images.forEach(img => {
+          if (img.file instanceof File) {
+            formDataToSend.append(`variantImages_${i}`, img.file);
+          }
+        });
+      }
+    });
+ 
+    // --- SUBMIT API ---
     try {
       const url = isEdit ? `${API_BASE_URL}/products/${isEdit}` : `${API_BASE_URL}/products`;
       const method = isEdit ? "put" : "post";
+
+      // const response = await axios[method](url, formDataToSend, {
+      //   headers: {
+      //     "Content-Type": "multipart/form-data",
+      //     "Authorization": `Bearer ${localStorage.getItem("token")}`,
+      //     "enctype":"multipart/form-data"
+      //   }
+      // });
+
       const response = await axios[method](url, formDataToSend, {
-        headers: { 
-          "Content-Type": "multipart/form-data",
+        headers: {
           "Authorization": `Bearer ${localStorage.getItem("token")}`
         }
       });
+
       if (response.data.success) {
         addToast(response.data.message || `Product ${isEdit ? "updated" : "added"} successfully`, "success");
         navigate("/products");
@@ -483,6 +641,7 @@ const AddProduct = () => {
     }
   };
 
+
   const tabs = [
     { id: "basic-details", label: "Basic Details" },
     { id: "variants", label: "Variants" },
@@ -490,6 +649,9 @@ const AddProduct = () => {
     { id: "images", label: "Images" },
     { id: "meta-title-keywords-description", label: "SEO & Meta" }
   ];
+
+  console.log(formData.variants);
+  
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-3 sm:p-4 lg:p-6">
@@ -635,7 +797,7 @@ const AddProduct = () => {
                     >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
-                      <option value="draft">Draft</option>
+                      {/* <option value="draft">Draft</option> */}
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -648,8 +810,8 @@ const AddProduct = () => {
                     >
                       <option value="in_stock">In Stock</option>
                       <option value="out_of_stock">Out of Stock</option>
-                      <option value="pre_order">Pre-Order</option>
-                      <option value="discontinued">Discontinued</option>
+                      {/* <option value="pre_order">Pre-Order</option>
+                      <option value="discontinued">Discontinued</option> */}
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -776,9 +938,8 @@ const AddProduct = () => {
                                   )}
                                 </select>
                               </td>
-
                               <td className="px-4 py-4">
-                                {/* <select
+                                <select
                                   name="size"
                                   value={variant.size}
                                   onChange={(e) => handleInputChange(e, index, 'variant')}
@@ -795,11 +956,11 @@ const AddProduct = () => {
                                   ) : (
                                     <option disabled>Loading sizes...</option>
                                   )}
-                                </select> */}
+                                </select>
 
-                                
 
-                                <div className="space-y-2">
+
+                                {/* <div className="space-y-2">
                                   {sizes.map((size) => {
                                     const isSelected = variant.sizes?.some(s => s.size === size.name);
 
@@ -828,27 +989,9 @@ const AddProduct = () => {
                                       </div>
                                     );
                                   })}
-                                </div>
+                                </div> */}
 
-                              </td>
-
-                              {/* <td className="px-4 py-4">
-                                <select
-                                  multiple
-                                  name="sizes"
-                                  value={variant.size.map(s => s.size)}
-                                  onChange={(e) => handleMultiSizeChange(e, index)}
-                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                                >
-                                  {sizes.map((size) => (
-                                    <option key={size.id} value={size.name}>
-                                      {size.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              </td> */}
-
-
+                              </td>          
                               <td className="px-4 py-4">
                                 <input
                                   type="text"
@@ -919,34 +1062,36 @@ const AddProduct = () => {
                               </td>
                             </>
                           ) : (
+                     
                             <>
-                              <td className="px-4 py-4 text-sm font-medium text-slate-800">{variant.color || '-'}</td>
-                              <td className="px-4 py-4 text-sm font-medium text-slate-800">{variant.size || '-'}</td>
-                              <td className="px-4 py-4 text-sm font-medium text-slate-800">{variant.type || '-'}</td>
-                              <td className="px-4 py-4 text-sm text-slate-700 font-semibold">{variant.price ? `₹${variant.price}` : '-'}</td>
-                              <td className="px-4 py-4 text-sm text-slate-700">{variant.originalPrice ? `₹${variant.originalPrice}` : '-'}</td>
-                              <td className="px-4 py-4 text-sm text-slate-700">{variant.quantity || '-'}</td>
-                              <td className="px-4 py-4 text-right">
-                                <div className="flex justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => startEditingVariant(index)}
-                                    className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200"
-                                    title="Edit"
-                                  >
-                                    <Pencil size={16} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeVariant(index)}
-                                    className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-all duration-200"
-                                    title="Delete"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
-                                </div>
-                              </td>
+                                  <td className="px-4 py-4 text-sm font-medium text-slate-800">{variant.color || '-'}</td>
+                                  <td className="px-4 py-4 text-sm font-medium text-slate-800">{variant.size || '-'}</td>
+                                  <td className="px-4 py-4 text-sm font-medium text-slate-800">{variant.type || '-'}</td>
+                                  <td className="px-4 py-4 text-sm text-slate-700 font-semibold">{variant.price ? `₹${variant.price}` : '-'}</td>
+                                  <td className="px-4 py-4 text-sm text-slate-700">{variant.originalPrice ? `₹${variant.originalPrice}` : '-'}</td>
+                                  <td className="px-4 py-4 text-sm text-slate-700">{variant.quantity || '-'}</td>
+                                  <td className="px-4 py-4 text-right">
+                                    <div className="flex justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => startEditingVariant(index)}
+                                        className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-all duration-200"
+                                        title="Edit"
+                                      >
+                                        <Pencil size={16} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => removeVariant(index)}
+                                        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-all duration-200"
+                                        title="Delete"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  </td>
                             </>
+                            
                           )}
                         </tr>
                       ))}
@@ -1048,70 +1193,77 @@ const AddProduct = () => {
               </div>
             )}
 
-            {/* Images Tab */}
             {activeTab === "images" && (
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-4">Product Images</label>
-                  <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center bg-gradient-to-br from-slate-50 to-blue-50 hover:from-blue-50 hover:to-indigo-50 transition-all duration-300">
-                    <input
-                      type="file"
-                      multiple
-                      accept="image/*"
-                      onChange={handleImageChange}
-                      className="hidden"
-                      id="product-images"
-                    />
-                    <label htmlFor="product-images" className="cursor-pointer flex flex-col items-center">
-                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-4">
-                        <ImageIcon size={32} className="text-white" />
-                      </div>
-                      <span className="text-lg font-semibold text-slate-700 mb-2">Upload Product Images</span>
-                      <span className="text-sm text-slate-500">PNG, JPG, WEBP up to 5MB each</span>
-                    </label>
-                  </div>
-                </div>
-                {imagePreviews.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    {imagePreviews.map((preview, index) => (
-                      <div key={`preview-${index}`} className="relative group">
-                        <div className="aspect-square rounded-xl overflow-hidden bg-slate-100 border-2 border-slate-200 hover:border-blue-300 transition-all duration-200">
-                          <img
-                            src={preview || "/placeholder.svg"}
-                            alt={`Preview ${index + 1}`}
-                            className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-200"
-                            onError={(e) => { e.target.src = "/placeholder.svg?height=200&width=200" }}
-                            onClick={() => viewFullImage(index)}
-                          />
+              <div>
+                {formData.variants.map((variant, variantIndex) => (
+                  <div key={variantIndex} className="border p-4 rounded-lg mt-4 mb-6">
+                    <h3 className="text-lg font-bold mb-3">
+                      Variant {variantIndex + 1}: {variant.color ? `Color: ${variant.color}` : 'No color'} | {variant.size ? `Size: ${variant.size}` : 'No size'}
+                    </h3>
+
+                    {variant.images && variant.images.length > 0 ? (
+                      <>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 mt-3">
+                          {variant.images.map((image, imgIndex) => (
+                            <div
+                              key={imgIndex}
+                              className="relative group w-full aspect-square rounded-lg overflow-hidden border border-slate-200 bg-gray-100"
+                            >
+                              {/* Display either preview or the image itself */}
+                              <img
+                                src={image.preview || image}
+                                alt={`Variant ${variantIndex + 1} - Image ${imgIndex + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.target.src = "/placeholder.svg?height=200&width=200";
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeVariantImage(variantIndex, imgIndex)}
+                                className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white rounded-full
+                      w-6 h-6 flex items-center justify-center text-xs
+                      opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ))}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 transform hover:scale-110"
-                        >
-                          <X size={14} />
-                        </button>
+                        <p className="text-sm text-gray-500 mt-2">
+                          {variant.images.length} image(s) uploaded
+                        </p>
+                      </>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>No images uploaded for this variant</p>
                       </div>
-                    ))}
-                  </div>
-                )}
-                {selectedImageIndex !== null && (
-                  <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-                    <div className="relative max-w-4xl w-full">
-                      <img
-                        src={imagePreviews[selectedImageIndex] || "/placeholder.svg"}
-                        alt="Full view"
-                        className="w-full h-auto rounded-xl"
+                    )}
+
+                    {/* Upload images */}
+                    <div className="mt-5">
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        id={`variant-img-${variantIndex}`}
+                        className="hidden"
+                        onChange={(e) => handleVariantImageChange(e, variantIndex)}
                       />
-                      <button
-                        onClick={closeFullImage}
-                        className="absolute top-4 right-4 bg-red-500 hover:bg-red-600 text-white rounded-full p-2"
+                      <label
+                        htmlFor={`variant-img-${variantIndex}`}
+                        className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200"
                       >
-                        <X size={24} />
-                      </button>
+                        <Upload size={16} />
+                        <span>Upload Images for this Variant</span>
+                      </label>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Recommended: 3-5 images showing different angles
+                      </p>
                     </div>
                   </div>
-                )}
+                ))}
               </div>
             )}
 
